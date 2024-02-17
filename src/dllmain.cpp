@@ -10,7 +10,7 @@ using namespace std;
 // Ini parser setup
 inipp::Ini<char> ini;
 string sFixName = "P5StrikersFix";
-string sFixVer = "1.0";
+string sFixVer = "0.8.0";
 string sLogFile = "P5StrikersFix.log";
 string sConfigFile = "P5StrikersFix.ini";
 string sExeName;
