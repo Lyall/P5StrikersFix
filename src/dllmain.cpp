@@ -5,16 +5,14 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <safetyhook.hpp>
 
-using namespace std;
-
 // Ini parser setup
 inipp::Ini<char> ini;
-string sFixName = "P5StrikersFix";
-string sFixVer = "0.8.0";
-string sLogFile = "P5StrikersFix.log";
-string sConfigFile = "P5StrikersFix.ini";
-string sExeName;
-filesystem::path sExePath;
+std::string sFixName = "P5StrikersFix";
+std::string sFixVer = "0.8.0";
+std::string sLogFile = "P5StrikersFix.log";
+std::string sConfigFile = "P5StrikersFix.ini";
+std::string sExeName;
+std::filesystem::path sExePath;
 std::pair DesktopDimensions = { 0,0 };
 
 // Ini variables

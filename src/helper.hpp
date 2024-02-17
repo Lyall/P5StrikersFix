@@ -1,7 +1,5 @@
 #include "stdafx.h"
 
-using namespace std;
-
 namespace Memory
 {
     template<typename T>
