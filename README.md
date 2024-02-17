@@ -2,7 +2,7 @@
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/W7W01UAI9)</br>
 [![Github All Releases](https://img.shields.io/github/downloads/Lyall/P5StrikersFix/total.svg)](https://github.com/Lyall/P5StrikersFix/releases)
 
-This is a fix that adds custom resolutions, ultrawide support and more to Persona 5 Strikers.<br />
+This is a fix that adds custom resolutions, ultrawide support and more to Persona 5 Strikers.
 
 ## Features
 - Custom resolution support.
@@ -30,7 +30,7 @@ This list will contain bugs which may or may not be fixed.
 
 ## Screenshots
 
-|  |
+| ![ezgif-4-8983b25596](https://github.com/Lyall/P5StrikersFix/assets/695941/76edf561-06c0-455c-9bd4-8df7cbc0d07d) |
 |:--:|
 | Gameplay |
 
