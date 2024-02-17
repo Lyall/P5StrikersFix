@@ -213,19 +213,27 @@ void ResolutionFix()
 
 void UIFix()
 {
-    if (bFixUI && fAspectRatio > fNativeAspect)
+    if (bFixUI)
     {
         // Force 16:9 UI
-        uint8_t* UIAspectScanResult = Memory::PatternScan(baseModule, "F3 0F ?? ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? 0F ?? ?? ?? ?? 41 ?? 01");
+        uint8_t* UIAspectScanResult = Memory::PatternScan(baseModule, "49 ?? ?? 01 75 ?? 0F ?? ?? 41 ?? 01 0F ?? ??");
         if (UIAspectScanResult)
         {
             spdlog::info("UI: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)UIAspectScanResult - (uintptr_t)baseModule);
 
             static SafetyHookMid UIAspectMidHook{};
-            UIAspectMidHook = safetyhook::create_mid(UIAspectScanResult,
+            UIAspectMidHook = safetyhook::create_mid(UIAspectScanResult + 0x6,
                 [](SafetyHookContext& ctx)
                 {
-                    ctx.xmm7.f32[0] = fAspectRatio;
+                    if (fAspectRatio > fNativeAspect)
+                    {
+                        *reinterpret_cast<float*>(ctx.rax + 0x3C) = fAspectRatio;
+                    }
+                    else if (fAspectRatio < fNativeAspect)
+                    {
+                        *reinterpret_cast<float*>(ctx.rax + 0x38) = (atanf(tanf(45.0f * (fPi / 360)) / fAspectRatio * fNativeAspect) * (360 / fPi)) * fPi / 180;
+                        *reinterpret_cast<float*>(ctx.rax + 0x3C) = fAspectRatio;
+                    }
                 });
         }
         else if (!UIAspectScanResult)
