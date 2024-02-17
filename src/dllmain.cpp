@@ -101,7 +101,6 @@ void ReadConfig()
     inipp::get_value(ini.sections["Fix FOV"], "Enabled", bFixFOV);
     inipp::get_value(ini.sections["Fix FOV"], "AdditionalFOV", fAdditionalFOV);
 
-
     // Log config parse
     spdlog::info("Config Parse: iInjectionDelay: {}ms", iInjectionDelay);
     spdlog::info("Config Parse: bCustomRes: {}", bCustomRes);
@@ -318,8 +317,6 @@ void FOVFix()
             spdlog::error("Gameplay FOV: Pattern scan failed.");
         }
     }
-
-
 }
 
 DWORD __stdcall Main(void*)
