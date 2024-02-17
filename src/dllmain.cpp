@@ -24,8 +24,10 @@ int iCustomResX;
 int iCustomResY;
 bool bFixUI;
 bool bFixFOV;
+float fAdditionalFOV;
 
 // Aspect ratio + HUD stuff
+float fPi = (float)3.141592653;
 float fAspectRatio;
 float fNativeAspect = (float)16 / 9;
 float fAspectMultiplier;
@@ -71,7 +73,7 @@ void Logging()
     spdlog::info("Module Name: {0:s}", sExeName.c_str());
     spdlog::info("Module Path: {0:s}", sExePath.string().c_str());
     spdlog::info("Module Address: 0x{0:x}", (uintptr_t)baseModule);
-    spdlog::info("Module Timesstamp: {0:d}", Memory::ModuleTimestamp(baseModule));
+    spdlog::info("Module Timestamp: {0:d}", Memory::ModuleTimestamp(baseModule));
     spdlog::info("----------");
 }
 
@@ -97,6 +99,8 @@ void ReadConfig()
     inipp::get_value(ini.sections["Custom Resolution"], "Height", iCustomResY);
     inipp::get_value(ini.sections["Fix UI"], "Enabled", bFixUI);
     inipp::get_value(ini.sections["Fix FOV"], "Enabled", bFixFOV);
+    inipp::get_value(ini.sections["Fix FOV"], "AdditionalFOV", fAdditionalFOV);
+
 
     // Log config parse
     spdlog::info("Config Parse: iInjectionDelay: {}ms", iInjectionDelay);
@@ -105,6 +109,7 @@ void ReadConfig()
     spdlog::info("Config Parse: iCustomResY: {}", iCustomResY);
     spdlog::info("Config Parse: bFixUI: {}", bFixUI);
     spdlog::info("Config Parse: bFixFOV: {}", bFixFOV);
+    spdlog::info("Config Parse: fAdditionalFOV: {}", fAdditionalFOV);
     spdlog::info("----------");
 
     // Calculate aspect ratio / use desktop res instead
@@ -208,7 +213,7 @@ void ResolutionFix()
 
 void UIFix()
 {
-    if (bFixUI)
+    if (bFixUI && fAspectRatio > fNativeAspect)
     {
         // Force 16:9 UI
         uint8_t* UIAspectScanResult = Memory::PatternScan(baseModule, "F3 0F ?? ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? 0F ?? ?? ?? ?? 41 ?? 01");
@@ -254,24 +259,59 @@ void FOVFix()
 {   
     if (bFixFOV)
     {
-        // Fix vert- FOV during cutscenes
+        // Fix FOV during cutscenes
         uint8_t* CutsceneFOVScanResult = Memory::PatternScan(baseModule, "F3 0F ?? ?? ?? ?? ?? ?? F3 0F ?? ?? F3 0F ?? ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? F3 0F ?? ?? ?? ?? 48 8D ?? ?? ?? F3 0F ?? ?? ?? ?? ?? ??");
         if (CutsceneFOVScanResult)
         {
             spdlog::info("Cutscene FOV: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)CutsceneFOVScanResult - (uintptr_t)baseModule);
 
             static SafetyHookMid CutsceneFOVMidHook{};
-            CutsceneFOVMidHook = safetyhook::create_mid(CutsceneFOVScanResult + 0x8,
+            CutsceneFOVMidHook = safetyhook::create_mid(CutsceneFOVScanResult + 0xC,
                 [](SafetyHookContext& ctx)
                 {
-                    ctx.xmm0.f32[0] = fNativeAspect;
+                    if (fAspectRatio > fNativeAspect)
+                    {
+                        ctx.xmm0.f32[0] = fNativeAspect * fNativeAspect;
+                    }
+                    else if (fAspectRatio < fNativeAspect)
+                    {
+                        ctx.xmm0.f32[0] *= fAspectMultiplier;
+                    }
                 });
         }
         else if (!CutsceneFOVScanResult)
         {
             spdlog::error("Cutscene FOV: Pattern scan failed.");
         }
+
+        // Fix FOV during gameplay
+        uint8_t* GameplayFOVScanResult = Memory::PatternScan(baseModule, "E8 ?? ?? ?? ?? F3 0F ?? ?? ?? ?? ?? 00 41 ?? 01 F3 0F ?? ?? ?? ?? ?? ?? 41 ?? ?? ?? 48 ?? ??");
+        if (GameplayFOVScanResult)
+        {
+            spdlog::info("Gameplay FOV: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)GameplayFOVScanResult - (uintptr_t)baseModule);
+
+            static SafetyHookMid GameplayFOVMidHook{};
+            GameplayFOVMidHook = safetyhook::create_mid(GameplayFOVScanResult + 0xD,
+                [](SafetyHookContext& ctx)
+                {
+                    if (fAspectRatio > fNativeAspect)
+                    {
+                        ctx.xmm0.f32[0] += fAdditionalFOV;
+                    }
+                    else if (fAspectRatio < fNativeAspect)
+                    {
+                        ctx.xmm0.f32[0] = atanf(tanf(ctx.xmm0.f32[0] * (fPi / 360)) / fAspectRatio * fNativeAspect) * (360 / fPi);
+                        ctx.xmm0.f32[0] += fAdditionalFOV;
+                    }
+                });
+        }
+        else if (!GameplayFOVScanResult)
+        {
+            spdlog::error("Gameplay FOV: Pattern scan failed.");
+        }
     }
+
+
 }
 
 DWORD __stdcall Main(void*)
