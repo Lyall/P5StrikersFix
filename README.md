@@ -24,6 +24,10 @@ This is a fix that adds custom resolutions, ultrawide support and more to Person
 Please report any issues you see.
 This list will contain bugs which may or may not be fixed.
 
+- Mouse input in menus is misaligned.
+- Floating markers (i.e. enemy health hearts/damage numbers, dialogue interaction markers) are displayed at the wrong aspect ratio.
+- Overlays/frames/fades are aligned to a 16:9 frame.
+
 ## Screenshots
 
 |  |
