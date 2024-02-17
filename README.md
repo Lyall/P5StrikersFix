@@ -30,7 +30,7 @@ This list will contain bugs which may or may not be fixed.
 
 ## Screenshots
 
-|  |
+| ![ezgif-4-8983b25596](https://github.com/Lyall/P5StrikersFix/assets/695941/76edf561-06c0-455c-9bd4-8df7cbc0d07d) |
 |:--:|
 | Gameplay |
 
