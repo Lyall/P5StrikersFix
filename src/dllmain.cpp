@@ -218,7 +218,7 @@ void ResolutionFix()
 
 void UIFix()
 {
-    if (bFixUI || bDisableLetterboxing)
+    if (bFixUI)
     {
         // Force 16:9 UI
         uint8_t* UIAspectScanResult = Memory::PatternScan(baseModule, "49 ?? ?? 01 75 ?? 0F ?? ?? 41 ?? 01 0F ?? ??");
@@ -244,67 +244,6 @@ void UIFix()
         else if (!UIAspectScanResult)
         {
             spdlog::error("UI Aspect Ratio: Pattern scan failed.");
-        }
-
-        // UI Width
-        uint8_t* UIWidthScanResult = Memory::PatternScan(baseModule, "8B ?? ?? ?? ?? 00 89 ?? ?? 49 ?? ?? ?? 48 ?? ?? FF ?? ?? ?? ?? 00");
-        if (UIWidthScanResult)
-        {
-            spdlog::info("UI Width: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)UIWidthScanResult - (uintptr_t)baseModule);
-            
-            static SafetyHookMid UIWidth2MidHook{};
-            UIWidth2MidHook = safetyhook::create_mid(UIWidthScanResult,
-                [](SafetyHookContext& ctx)
-                {
-                    if (ctx.rax + 0xF0 && ctx.rax + 0xF2)
-                    {
-                        // Useful for finding UI object names
-                        //std::string objectName = (std::string)(char*)(ctx.rax + 0x280);
-                        //spdlog::info("UI Width: Object name = {}: {}x{}", objectName, *reinterpret_cast<short*>(ctx.rax + 0xF0), *reinterpret_cast<short*>(ctx.rax + 0xF2));
-                         
-                        // Resize all UI elements that are 1920-2048x1080-1200
-                        // Check for marker to make sure we aren't editing the same element more than once. (This is a jank solution.)
-                        if ((*reinterpret_cast<short*>(ctx.rax + 0xF0) >= (short)1920 && *reinterpret_cast<short*>(ctx.rax + 0xF0) <= (short)2048) && (*reinterpret_cast<short*>(ctx.rax + 0xF2) >= (short)1080 && *reinterpret_cast<short*>(ctx.rax + 0xF2) <= (short)1200) && (*reinterpret_cast<short*>(ctx.rax + 0x4C) == 0))
-                        {
-                            if (fAspectRatio > fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = *reinterpret_cast<short*>(ctx.rax + 0xF2) * fAspectRatio;
-                                // Write marker so we know this UI element has been modified.
-                                *reinterpret_cast<short*>(ctx.rax + 0x4C) = 420;
-                            }
-                            else if (fAspectRatio < fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = *reinterpret_cast<short*>(ctx.rax + 0xF0) / fAspectRatio;
-                                // Write marker so we know this UI element has been modified.
-                                *reinterpret_cast<short*>(ctx.rax + 0x4C) = 420;
-                            }
-                        }
-
-                        // Cutscene letterboxing
-                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)1920 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)256)
-                        {
-                            if (fAspectRatio > fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)1920 * fAspectMultiplier;
-                            }
-                            else if (fAspectRatio < fNativeAspect)
-                            {
-                                // This is kind of jank, just flipping the texture. Would recommend just disabling letterboxing at <16:9
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)-(256 + fHUDHeightOffset);
-                            }
-
-                            if (bDisableLetterboxing)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)0;
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)0;
-                            }
-                        }
-                    }
-                });      
-        }
-        else if (!UIWidthScanResult)
-        {
-            spdlog::error("UI Width: Pattern scan failed.");
         }
 
         // Fix offset cursor position when UI is scaled to 16:9
@@ -347,7 +286,82 @@ void UIFix()
         else if (!UICursorPos1ScanResult || !UICursorPos2ScanResult)
         {
             spdlog::error("UI Cursor Position: Pattern scan failed.");
-        } 
+        }
+    }
+
+    if (bFixUI || bDisableLetterboxing)
+    {
+        // UI Width
+        uint8_t* UIWidthScanResult = Memory::PatternScan(baseModule, "8B ?? ?? ?? ?? 00 89 ?? ?? 49 ?? ?? ?? 48 ?? ?? FF ?? ?? ?? ?? 00");
+        if (UIWidthScanResult)
+        {
+            spdlog::info("UI Width: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)UIWidthScanResult - (uintptr_t)baseModule);
+
+            static bool bHasFixedFMVs = false;
+            static SafetyHookMid UIWidth2MidHook{};
+            UIWidth2MidHook = safetyhook::create_mid(UIWidthScanResult,
+                [](SafetyHookContext& ctx)
+                {
+                    if (ctx.rax + 0xF0 && ctx.rax + 0xF2)
+                    {
+                        // Useful for finding UI object names
+                        //std::string objectName = (std::string)(char*)(ctx.rax + 0x280);
+                        //spdlog::info("UI Width: Object name = {}: {}x{}", objectName, *reinterpret_cast<short*>(ctx.rax + 0xF0), *reinterpret_cast<short*>(ctx.rax + 0xF2));
+
+                        // Resize all UI elements that are 1920-2048x1080-1200
+                        // Check for marker to make sure we aren't editing the same element more than once. (This is a jank solution.)
+                        if ((*reinterpret_cast<short*>(ctx.rax + 0xF0) >= (short)1920 && *reinterpret_cast<short*>(ctx.rax + 0xF0) <= (short)2048) && (*reinterpret_cast<short*>(ctx.rax + 0xF2) >= (short)1080 && *reinterpret_cast<short*>(ctx.rax + 0xF2) <= (short)1200) && (*reinterpret_cast<short*>(ctx.rax + 0x4C) == 0))
+                        {
+                            if (fAspectRatio > fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = *reinterpret_cast<short*>(ctx.rax + 0xF2) * fAspectRatio;
+                                // Write marker so we know this UI element has been modified.
+                                *reinterpret_cast<short*>(ctx.rax + 0x4C) = 420;
+                            }
+                            else if (fAspectRatio < fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = *reinterpret_cast<short*>(ctx.rax + 0xF0) / fAspectRatio;
+                                // Write marker so we know this UI element has been modified.
+                                *reinterpret_cast<short*>(ctx.rax + 0x4C) = 420;
+                            }
+
+                            // FMVs
+                            if (*reinterpret_cast<int*>(ctx.rax + 0x3A0) == (int)4278583300 && !bHasFixedFMVs)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)1920;
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)1080;
+                                spdlog::info("UI Width: Fixed movie playback layer.");
+                                bHasFixedFMVs = true;
+                            }
+                        }
+
+                        // Cutscene letterboxing
+                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)1920 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)256)
+                        {
+                            if (fAspectRatio > fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)1920 * fAspectMultiplier;
+                            }
+                            else if (fAspectRatio < fNativeAspect)
+                            {
+                                // This is dumb, just flipping the texture. Would recommend just disabling letterboxing at <16:9.
+                                // TODO: Come up with an alternative to this shit.
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)-(256 + fHUDHeightOffset);
+                            }
+
+                            if (bDisableLetterboxing)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)0;
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)0;
+                            }
+                        }
+                    }
+                });
+        }
+        else if (!UIWidthScanResult)
+        {
+            spdlog::error("UI Width: Pattern scan failed.");
+        }
     }
 }
 
