@@ -260,78 +260,21 @@ void UIFix()
                         //std::string objectName = (std::string)(char*)(ctx.rax + 0x280);
                         //spdlog::info("UI Width: Object name = {}: {}x{}", objectName, *reinterpret_cast<short*>(ctx.rax + 0xF0), *reinterpret_cast<short*>(ctx.rax + 0xF2));
                          
-
-                        // ---------------------------------------------------------------------------------------------------------------------------------
-                        // begin rant
-                        // all of these could be swapped to a single check for >1920 and >1080
-                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)1922 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1082)
+                        // Resize all UI elements that are 1920-2048x1080-1200
+                        // Check for marker to make sure we aren't editing the same element more than once. (This is a jank solution.)
+                        if ((*reinterpret_cast<short*>(ctx.rax + 0xF0) >= (short)1920 && *reinterpret_cast<short*>(ctx.rax + 0xF0) <= (short)2048) && (*reinterpret_cast<short*>(ctx.rax + 0xF2) >= (short)1080 && *reinterpret_cast<short*>(ctx.rax + 0xF2) <= (short)1200) && (*reinterpret_cast<short*>(ctx.rax + 0x4C) == 0))
                         {
                             if (fAspectRatio > fNativeAspect)
                             {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = 1082 * fAspectRatio;
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = *reinterpret_cast<short*>(ctx.rax + 0xF2) * fAspectRatio;
+                                // Write marker so we know this UI element has been modified.
+                                *reinterpret_cast<short*>(ctx.rax + 0x4C) = 420;
                             }
                             else if (fAspectRatio < fNativeAspect)
                             {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = 1922 / fAspectRatio;
-                            }
-                        }
-
-                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)1924 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1084)
-                        {
-                            if (fAspectRatio > fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = 1084 * fAspectRatio;
-                            }
-                            else if (fAspectRatio < fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = 1924 / fAspectRatio;
-                            }
-                        }
-                                                
-                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)2048 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1200)
-                        {
-                            if (fAspectRatio > fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = 1200 * fAspectRatio;
-                            }
-                            else if (fAspectRatio < fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = 2048 / fAspectRatio;
-                            }
-                        }
-
-                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)2016 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1134)
-                        {
-                            if (fAspectRatio > fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = 1134 * fAspectRatio;
-                            }
-                            else if (fAspectRatio < fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = 2016 / fAspectRatio;
-                            }
-                        }
-
-                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)2000 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1100)
-                        {
-                            if (fAspectRatio > fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = 1100 * fAspectRatio;
-                            }
-                            else if (fAspectRatio < fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = 2000 / fAspectRatio;
-                            }
-                        }
-                        // end rant
-                        // ---------------------------------------------------------------------------------------------------------------------------------
-
-                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) > (short)1920)
-                        {
-                            //spdlog::info("UI Width: Over 1920px: Object name = {}: {}x{}", objectName, *reinterpret_cast<short*>(ctx.rax + 0xF0), *reinterpret_cast<short*>(ctx.rax + 0xF2));
-                            if (fAspectRatio > fNativeAspect)
-                            {
-                                //*reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)2048 * fAspectMultiplier;
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = *reinterpret_cast<short*>(ctx.rax + 0xF0) / fAspectRatio;
+                                // Write marker so we know this UI element has been modified.
+                                *reinterpret_cast<short*>(ctx.rax + 0x4C) = 420;
                             }
                         }
 
@@ -347,19 +290,6 @@ void UIFix()
                             {
                                 *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)0;
                                 *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)0;
-                            }
-                        }
-                      
-                        // 1080p UI elements
-                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)1920 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1080)
-                        {
-                            if (fAspectRatio > fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)1080 * fAspectRatio;
-                            }
-                            else if (fAspectRatio < fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)1920 / fAspectRatio;
                             }
                         }
                     }
