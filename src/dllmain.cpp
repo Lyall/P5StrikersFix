@@ -8,7 +8,7 @@
 // Ini parser setup
 inipp::Ini<char> ini;
 std::string sFixName = "P5StrikersFix";
-std::string sFixVer = "0.8.0";
+std::string sFixVer = "0.8.1";
 std::string sLogFile = "P5StrikersFix.log";
 std::string sConfigFile = "P5StrikersFix.ini";
 std::string sExeName;
@@ -23,6 +23,7 @@ int iCustomResY;
 bool bFixUI;
 bool bFixFOV;
 float fAdditionalFOV;
+bool bDisableLetterboxing;
 
 // Aspect ratio + HUD stuff
 float fPi = (float)3.141592653;
@@ -98,6 +99,7 @@ void ReadConfig()
     inipp::get_value(ini.sections["Fix UI"], "Enabled", bFixUI);
     inipp::get_value(ini.sections["Fix FOV"], "Enabled", bFixFOV);
     inipp::get_value(ini.sections["Fix FOV"], "AdditionalFOV", fAdditionalFOV);
+    inipp::get_value(ini.sections["Disable Cutscene Letterboxing"], "Enabled", bDisableLetterboxing);
 
     // Log config parse
     spdlog::info("Config Parse: iInjectionDelay: {}ms", iInjectionDelay);
@@ -107,6 +109,7 @@ void ReadConfig()
     spdlog::info("Config Parse: bFixUI: {}", bFixUI);
     spdlog::info("Config Parse: bFixFOV: {}", bFixFOV);
     spdlog::info("Config Parse: fAdditionalFOV: {}", fAdditionalFOV);
+    spdlog::info("Config Parse: bDisableLetterboxing: {}", bDisableLetterboxing);
     spdlog::info("----------");
 
     // Calculate aspect ratio / use desktop res instead
@@ -210,13 +213,13 @@ void ResolutionFix()
 
 void UIFix()
 {
-    if (bFixUI)
+    if (bFixUI || bDisableLetterboxing)
     {
         // Force 16:9 UI
         uint8_t* UIAspectScanResult = Memory::PatternScan(baseModule, "49 ?? ?? 01 75 ?? 0F ?? ?? 41 ?? 01 0F ?? ??");
         if (UIAspectScanResult)
         {
-            spdlog::info("UI: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)UIAspectScanResult - (uintptr_t)baseModule);
+            spdlog::info("UI Aspect Ratio: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)UIAspectScanResult - (uintptr_t)baseModule);
 
             static SafetyHookMid UIAspectMidHook{};
             UIAspectMidHook = safetyhook::create_mid(UIAspectScanResult + 0x6,
@@ -235,7 +238,115 @@ void UIFix()
         }
         else if (!UIAspectScanResult)
         {
-            spdlog::error("UI: Pattern scan failed.");
+            spdlog::error("UI Aspect Ratio: Pattern scan failed.");
+        }
+
+        // UI Width
+        uint8_t* UIWidthScanResult = Memory::PatternScan(baseModule, "8B ?? ?? ?? ?? 00 89 ?? ?? 49 ?? ?? ?? 48 ?? ?? FF ?? ?? ?? ?? 00");
+        if (UIWidthScanResult)
+        {
+            spdlog::info("UI Width: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)UIWidthScanResult - (uintptr_t)baseModule);
+            
+            static SafetyHookMid UIWidth2MidHook{};
+            UIWidth2MidHook = safetyhook::create_mid(UIWidthScanResult,
+                [](SafetyHookContext& ctx)
+                {
+                    if (ctx.rax + 0xF0 && ctx.rax + 0xF2)
+                    {
+                        // Useful for finding UI object names
+                        //std::string objectName = (std::string)(char*)(ctx.rax + 0x280);
+                        //spdlog::info("UI Width: Object name = {}: {}x{}", objectName, *reinterpret_cast<short*>(ctx.rax + 0xF0), *reinterpret_cast<short*>(ctx.rax + 0xF2));
+                         
+                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)1922 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1082)
+                        {
+                            if (fAspectRatio > fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = 1082 * fAspectRatio;
+                            }
+                            else if (fAspectRatio < fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = 1922 / fAspectRatio;
+                            }
+                        }
+
+                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)1924 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1084)
+                        {
+                            if (fAspectRatio > fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = 1084 * fAspectRatio;
+                            }
+                            else if (fAspectRatio < fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = 1924 / fAspectRatio;
+                            }
+                        }
+                                                
+                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)2048 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1200)
+                        {
+                            if (fAspectRatio > fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = 1200 * fAspectRatio;
+                            }
+                            else if (fAspectRatio < fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = 2048 / fAspectRatio;
+                            }
+                        }
+
+                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)2016 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1134)
+                        {
+                            if (fAspectRatio > fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = 1134 * fAspectRatio;
+                            }
+                            else if (fAspectRatio < fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = 2016 / fAspectRatio;
+                            }
+                        }
+
+                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) > (short)1920)
+                        {
+                            //spdlog::info("UI Width: Over 1920px: Object name = {}: {}x{}", objectName, *reinterpret_cast<short*>(ctx.rax + 0xF0), *reinterpret_cast<short*>(ctx.rax + 0xF2));
+                            if (fAspectRatio > fNativeAspect)
+                            {
+                                //*reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)2048 * fAspectMultiplier;
+                            }
+                        }
+
+                        // Cutscene letterboxing
+                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)1920 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)256)
+                        {
+                            if (fAspectRatio > fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)1920 * fAspectMultiplier;
+                            }
+
+                            if (bDisableLetterboxing)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)0;
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)0;
+                            }
+                        }
+                      
+                        // 1080p UI elements
+                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)1920 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1080)
+                        {
+                            if (fAspectRatio > fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)1080 * fAspectRatio;
+                            }
+                            else if (fAspectRatio < fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)1920 / fAspectRatio;
+                            }
+                        }
+                    }
+                });      
+        }
+        else if (!UIWidthScanResult)
+        {
+            spdlog::error("UI Width: Pattern scan failed.");
         }
 
         /*
