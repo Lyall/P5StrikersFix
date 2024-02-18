@@ -24,6 +24,7 @@ bool bFixUI;
 bool bFixFOV;
 float fAdditionalFOV;
 bool bDisableLetterboxing;
+int iShadowQuality;
 
 // Aspect ratio + HUD stuff
 float fPi = (float)3.141592653;
@@ -100,6 +101,7 @@ void ReadConfig()
     inipp::get_value(ini.sections["Fix FOV"], "Enabled", bFixFOV);
     inipp::get_value(ini.sections["Fix FOV"], "AdditionalFOV", fAdditionalFOV);
     inipp::get_value(ini.sections["Disable Cutscene Letterboxing"], "Enabled", bDisableLetterboxing);
+    inipp::get_value(ini.sections["Shadow Quality"], "Resolution", iShadowQuality);
 
     // Log config parse
     spdlog::info("Config Parse: iInjectionDelay: {}ms", iInjectionDelay);
@@ -110,6 +112,7 @@ void ReadConfig()
     spdlog::info("Config Parse: bFixFOV: {}", bFixFOV);
     spdlog::info("Config Parse: fAdditionalFOV: {}", fAdditionalFOV);
     spdlog::info("Config Parse: bDisableLetterboxing: {}", bDisableLetterboxing);
+    spdlog::info("Config Parse: iShadowQuality: {}", iShadowQuality);
     spdlog::info("----------");
 
     // Calculate aspect ratio / use desktop res instead
@@ -160,7 +163,7 @@ void ResolutionFix()
         uint8_t* ResolutionScanResult = Memory::PatternScan(baseModule, "89 ?? ?? ?? 00 00 48 ?? ?? ?? ?? ?? ?? 83 ?? ?? 77 ?? 8B ?? ?? ?? ?? ?? ?? EB ?? B9 D0 02 00 00");
         if (ResolutionScanResult)
         {
-            spdlog::info("Custom Resolution: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)ResolutionScanResult - (uintptr_t)baseModule);
+            spdlog::info("Custom Resolution: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)ResolutionScanResult - (uintptr_t)baseModule);
 
             static SafetyHookMid ResolutionWidthHook{};
             ResolutionWidthHook = safetyhook::create_mid(ResolutionScanResult,
@@ -187,7 +190,7 @@ void ResolutionFix()
         uint8_t* FullscreenModeScanResult = Memory::PatternScan(baseModule, "80 ?? ?? ?? ?? ?? 00 0F ?? ?? ?? ?? ?? 8B ?? ?? ?? ?? ?? 0F ?? ?? F3 0F ?? ?? ?? ?? ?? ?? 0F ?? ??");
         if (FullscreenModeScanResult)
         {
-            spdlog::info("Custom Resolution: Fullscreen: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)FullscreenModeScanResult - (uintptr_t)baseModule);
+            spdlog::info("Custom Resolution: Fullscreen: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)FullscreenModeScanResult - (uintptr_t)baseModule);
 
             Memory::PatchBytes((uintptr_t)FullscreenModeScanResult + 0x6, "\x05", 1);
         }
@@ -200,7 +203,7 @@ void ResolutionFix()
         uint8_t* BorderlessModeScanResult = Memory::PatternScan(baseModule, "80 ?? ?? ?? ?? ?? 00 74 ?? 80 ?? ?? ?? ?? ?? 00 74 ?? 4C ?? ?? ?? ?? ?? ?? 48 ?? ?? ?? ?? ?? ??");
         if (BorderlessModeScanResult)
         {
-            spdlog::info("Custom Resolution: Borderless: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)BorderlessModeScanResult - (uintptr_t)baseModule);
+            spdlog::info("Custom Resolution: Borderless: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)BorderlessModeScanResult - (uintptr_t)baseModule);
 
             Memory::PatchBytes((uintptr_t)BorderlessModeScanResult + 0x7, "\xEB", 1);
         }
@@ -219,7 +222,7 @@ void UIFix()
         uint8_t* UIAspectScanResult = Memory::PatternScan(baseModule, "49 ?? ?? 01 75 ?? 0F ?? ?? 41 ?? 01 0F ?? ??");
         if (UIAspectScanResult)
         {
-            spdlog::info("UI Aspect Ratio: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)UIAspectScanResult - (uintptr_t)baseModule);
+            spdlog::info("UI Aspect Ratio: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)UIAspectScanResult - (uintptr_t)baseModule);
 
             static SafetyHookMid UIAspectMidHook{};
             UIAspectMidHook = safetyhook::create_mid(UIAspectScanResult + 0x6,
@@ -245,7 +248,7 @@ void UIFix()
         uint8_t* UIWidthScanResult = Memory::PatternScan(baseModule, "8B ?? ?? ?? ?? 00 89 ?? ?? 49 ?? ?? ?? 48 ?? ?? FF ?? ?? ?? ?? 00");
         if (UIWidthScanResult)
         {
-            spdlog::info("UI Width: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)UIWidthScanResult - (uintptr_t)baseModule);
+            spdlog::info("UI Width: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)UIWidthScanResult - (uintptr_t)baseModule);
             
             static SafetyHookMid UIWidth2MidHook{};
             UIWidth2MidHook = safetyhook::create_mid(UIWidthScanResult,
@@ -257,6 +260,10 @@ void UIFix()
                         //std::string objectName = (std::string)(char*)(ctx.rax + 0x280);
                         //spdlog::info("UI Width: Object name = {}: {}x{}", objectName, *reinterpret_cast<short*>(ctx.rax + 0xF0), *reinterpret_cast<short*>(ctx.rax + 0xF2));
                          
+
+                        // ---------------------------------------------------------------------------------------------------------------------------------
+                        // begin rant
+                        // all of these could be swapped to a single check for >1920 and >1080
                         if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)1922 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1082)
                         {
                             if (fAspectRatio > fNativeAspect)
@@ -304,6 +311,20 @@ void UIFix()
                                 *reinterpret_cast<short*>(ctx.rax + 0xF2) = 2016 / fAspectRatio;
                             }
                         }
+
+                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)2000 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)1100)
+                        {
+                            if (fAspectRatio > fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = 1100 * fAspectRatio;
+                            }
+                            else if (fAspectRatio < fNativeAspect)
+                            {
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = 2000 / fAspectRatio;
+                            }
+                        }
+                        // end rant
+                        // ---------------------------------------------------------------------------------------------------------------------------------
 
                         if (*reinterpret_cast<short*>(ctx.rax + 0xF0) > (short)1920)
                         {
@@ -354,7 +375,7 @@ void UIFix()
         uint8_t* UICursorPosScanResult = Memory::PatternScan(baseModule, "0F ?? ?? 66 ?? ?? ?? 0F ?? ?? ?? F3 0F ?? ?? ?? ?? ?? ?? 66 ?? ?? ?? 0F ?? ?? ?? 0F ?? ?? 0F ?? ??");
         if (UICursorPosScanResult)
         {
-            spdlog::info("UI Cursor Position: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)UICursorPosScanResult - (uintptr_t)baseModule);
+            spdlog::info("UI Cursor Position: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)UICursorPosScanResult - (uintptr_t)baseModule);
 
             static SafetyHookMid UICursorPosMidHook{};
             UICursorPosMidHook = safetyhook::create_mid(UICursorPosScanResult + 0x3,
@@ -379,7 +400,7 @@ void FOVFix()
         uint8_t* CutsceneFOVScanResult = Memory::PatternScan(baseModule, "F3 0F ?? ?? ?? ?? ?? ?? F3 0F ?? ?? F3 0F ?? ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? F3 0F ?? ?? ?? ?? 48 8D ?? ?? ?? F3 0F ?? ?? ?? ?? ?? ??");
         if (CutsceneFOVScanResult)
         {
-            spdlog::info("Cutscene FOV: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)CutsceneFOVScanResult - (uintptr_t)baseModule);
+            spdlog::info("Cutscene FOV: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)CutsceneFOVScanResult - (uintptr_t)baseModule);
 
             static SafetyHookMid CutsceneFOVMidHook{};
             CutsceneFOVMidHook = safetyhook::create_mid(CutsceneFOVScanResult + 0xC,
@@ -404,7 +425,7 @@ void FOVFix()
         uint8_t* GameplayFOVScanResult = Memory::PatternScan(baseModule, "E8 ?? ?? ?? ?? F3 0F ?? ?? ?? ?? ?? 00 41 ?? 01 F3 0F ?? ?? ?? ?? ?? ?? 41 ?? ?? ?? 48 ?? ??");
         if (GameplayFOVScanResult)
         {
-            spdlog::info("Gameplay FOV: Address is {0:s}+{1:x}", sExeName.c_str(), (uintptr_t)GameplayFOVScanResult - (uintptr_t)baseModule);
+            spdlog::info("Gameplay FOV: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)GameplayFOVScanResult - (uintptr_t)baseModule);
 
             static SafetyHookMid GameplayFOVMidHook{};
             GameplayFOVMidHook = safetyhook::create_mid(GameplayFOVScanResult + 0xD,
@@ -428,6 +449,30 @@ void FOVFix()
     }
 }
 
+void GraphicalTweaks()
+{
+    if (iShadowQuality != 0)
+    {
+        // Shadow Quality
+        // Changes highest quality shadow resolution
+        uint8_t* ShadowQuality1ScanResult = Memory::PatternScan(baseModule, "00 10 00 00 00 10 00 00 4E 00 00 00 00 04 00 00");
+        uint8_t* ShadowQuality2ScanResult = Memory::PatternScan(baseModule, "BA 00 10 00 00 44 ?? ?? EB ?? BA 00 08 00 00 ");
+        if (ShadowQuality1ScanResult && ShadowQuality2ScanResult)
+        {
+            spdlog::info("Shadow Quality: Address 1 is {:s}+{:x}", sExeName.c_str(), (uintptr_t)ShadowQuality1ScanResult - (uintptr_t)baseModule);
+            spdlog::info("Shadow Quality: Address 2 is {:s}+{:x}", sExeName.c_str(), (uintptr_t)ShadowQuality2ScanResult - (uintptr_t)baseModule);
+
+            Memory::Write((uintptr_t)ShadowQuality1ScanResult, (int)iShadowQuality * 2);
+            Memory::Write((uintptr_t)ShadowQuality1ScanResult + 0x4, (int)iShadowQuality * 2);
+            Memory::Write((uintptr_t)ShadowQuality2ScanResult + 0x1, (int)iShadowQuality * 2);
+        }
+        else if (!ShadowQuality1ScanResult || !ShadowQuality2ScanResult)
+        {
+            spdlog::error("Shadow Quality: Pattern scan failed.");
+        }
+    }
+}
+
 DWORD __stdcall Main(void*)
 {
     Logging();
@@ -436,6 +481,7 @@ DWORD __stdcall Main(void*)
     ResolutionFix();
     UIFix();
     FOVFix();
+    GraphicalTweaks();
     return true; //end thread
 }
 
