@@ -159,6 +159,8 @@ void ResolutionFix()
 {
     if (bCustomRes)
     {
+        // TODO: Check to see DSR can be supported properly.
+
         // Apply custom resolution
         uint8_t* ResolutionScanResult = Memory::PatternScan(baseModule, "89 ?? ?? ?? 00 00 48 ?? ?? ?? ?? ?? ?? 83 ?? ?? 77 ?? 8B ?? ?? ?? ?? ?? ?? EB ?? B9 D0 02 00 00");
         if (ResolutionScanResult)
@@ -285,11 +287,16 @@ void UIFix()
                             {
                                 *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)1920 * fAspectMultiplier;
                             }
+                            else if (fAspectRatio < fNativeAspect)
+                            {
+                                // This is kind of jank, just flipping the texture. Would recommend just disabling letterboxing at <16:9
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)-(256 + fHUDHeightOffset);
+                            }
 
                             if (bDisableLetterboxing)
                             {
                                 *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)0;
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)0;
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)0;
                             }
                         }
                     }
@@ -300,25 +307,47 @@ void UIFix()
             spdlog::error("UI Width: Pattern scan failed.");
         }
 
-        /*
         // Fix offset cursor position when UI is scaled to 16:9
-        uint8_t* UICursorPosScanResult = Memory::PatternScan(baseModule, "0F ?? ?? 66 ?? ?? ?? 0F ?? ?? ?? F3 0F ?? ?? ?? ?? ?? ?? 66 ?? ?? ?? 0F ?? ?? ?? 0F ?? ?? 0F ?? ??");
-        if (UICursorPosScanResult)
+        uint8_t* UICursorPos1ScanResult = Memory::PatternScan(baseModule, "0F ?? ?? F3 0F ?? ?? F3 0F ?? ?? 0F ?? ?? 76 ?? 0F ?? ?? F3 0F ?? ?? F3 0F ?? ?? F3 0F ?? ?? 0F ?? ??");
+        uint8_t* UICursorPos2ScanResult = Memory::PatternScan(baseModule, "F3 0F ?? ?? 66 0F ?? ?? F3 0F ?? ?? 66 0F ?? ?? ?? ?? 0F ?? ?? F3 0F ?? ?? F3 0F ?? ?? 29 ?? ?? ??");
+        if (UICursorPos1ScanResult && UICursorPos2ScanResult)
         {
-            spdlog::info("UI Cursor Position: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)UICursorPosScanResult - (uintptr_t)baseModule);
+            spdlog::info("UI Cursor Position: Address 1 is {:s}+{:x}", sExeName.c_str(), (uintptr_t)UICursorPos1ScanResult - (uintptr_t)baseModule);
 
-            static SafetyHookMid UICursorPosMidHook{};
-            UICursorPosMidHook = safetyhook::create_mid(UICursorPosScanResult + 0x3,
+            static SafetyHookMid UICursorPos1MidHook{};
+            UICursorPos1MidHook = safetyhook::create_mid(UICursorPos1ScanResult,
                 [](SafetyHookContext& ctx)
                 {
-                    ctx.xmm5.f32[0] *= fAspectMultiplier;
+                    if (fAspectRatio > fNativeAspect)
+                    {
+                        ctx.xmm3.f32[0] = fHUDWidth;
+                    }
+                    else if (fAspectRatio < fNativeAspect)
+                    {
+                        ctx.xmm1.f32[0] = fHUDHeight;
+                    }
+                });
+
+            spdlog::info("UI Cursor Position: Address 2 is {:s}+{:x}", sExeName.c_str(), (uintptr_t)UICursorPos2ScanResult - (uintptr_t)baseModule);
+
+            static SafetyHookMid UICursorPos2MidHook{};
+            UICursorPos2MidHook = safetyhook::create_mid(UICursorPos2ScanResult,
+                [](SafetyHookContext& ctx)
+                {
+                    if (fAspectRatio > fNativeAspect)
+                    {
+                        ctx.xmm0.f32[0] = fHUDWidth;
+                    }
+                    else if (fAspectRatio < fNativeAspect)
+                    {
+                        ctx.rbx = (int)fHUDHeight;
+                    }
                 });
         }
-        else if (!UICursorPosScanResult)
+        else if (!UICursorPos1ScanResult || !UICursorPos2ScanResult)
         {
             spdlog::error("UI Cursor Position: Pattern scan failed.");
-        }
-        */
+        } 
     }
 }
 
