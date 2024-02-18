@@ -26,7 +26,6 @@ Please report any issues you see.
 This list will contain bugs which may or may not be fixed.
 
 - Floating markers (i.e. enemy health hearts/damage numbers, dialogue interaction markers) are displayed at the wrong aspect ratio.
-- FMV playback is stretched.
 
 ## Screenshots
 
