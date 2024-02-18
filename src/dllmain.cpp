@@ -326,6 +326,7 @@ void UIFix()
                             }
 
                             // FMVs
+                            // TODO: This only works because the first element that matches the check at 0x3A0 is the movie playback layer. If movie playback is disabled this will cause the pause screen background to be scaled wrong.
                             if (*reinterpret_cast<int*>(ctx.rax + 0x3A0) == (int)4278583300 && !bHasFixedFMVs)
                             {
                                 *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)1920;
