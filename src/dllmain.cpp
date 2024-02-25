@@ -8,7 +8,7 @@
 // Ini parser setup
 inipp::Ini<char> ini;
 std::string sFixName = "P5StrikersFix";
-std::string sFixVer = "0.8.1";
+std::string sFixVer = "1.0.0";
 std::string sLogFile = "P5StrikersFix.log";
 std::string sConfigFile = "P5StrikersFix.ini";
 std::string sExeName;
@@ -155,6 +155,31 @@ void ReadConfig()
     spdlog::info("----------");
 }
 
+void EarlyPatch()
+{
+    if (bFixUI)
+    {
+        // Set UI aspect ratio to 16:9
+        uint8_t* UIAspectScanResult = Memory::PatternScan(baseModule, "41 ?? 80 07 00 00 44 ?? ?? ?? ?? 41 ?? 38 04 00 00");
+        if (UIAspectScanResult)
+        {
+            spdlog::info("UI Aspect Ratio: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)UIAspectScanResult - (uintptr_t)baseModule);
+            if (fAspectRatio > fNativeAspect)
+            {
+                Memory::Write((uintptr_t)UIAspectScanResult + 0x2, (int)(1080 * fAspectRatio));
+            }
+            else if (fAspectRatio < fNativeAspect)
+            {
+                Memory::Write((uintptr_t)UIAspectScanResult + 0xD, (int)(1920 / fAspectRatio));
+            }
+        }
+        else if (!UIAspectScanResult)
+        {
+            spdlog::error("UI Aspect Ratio: Pattern scan failed.");
+        }
+    }
+}
+
 void ResolutionFix()
 {
     if (bCustomRes)
@@ -187,7 +212,7 @@ void ResolutionFix()
         {
             spdlog::error("Custom Resolution: Pattern scan failed.");
         }
-     
+
         // Stop fullscreen mode from being scaled to 16:9
         uint8_t* FullscreenModeScanResult = Memory::PatternScan(baseModule, "80 ?? ?? ?? ?? ?? 00 0F ?? ?? ?? ?? ?? 8B ?? ?? ?? ?? ?? 0F ?? ?? F3 0F ?? ?? ?? ?? ?? ?? 0F ?? ??");
         if (FullscreenModeScanResult)
@@ -220,32 +245,6 @@ void UIFix()
 {
     if (bFixUI)
     {
-        // Force 16:9 UI
-        uint8_t* UIAspectScanResult = Memory::PatternScan(baseModule, "49 ?? ?? 01 75 ?? 0F ?? ?? 41 ?? 01 0F ?? ??");
-        if (UIAspectScanResult)
-        {
-            spdlog::info("UI Aspect Ratio: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)UIAspectScanResult - (uintptr_t)baseModule);
-
-            static SafetyHookMid UIAspectMidHook{};
-            UIAspectMidHook = safetyhook::create_mid(UIAspectScanResult + 0x6,
-                [](SafetyHookContext& ctx)
-                {
-                    if (fAspectRatio > fNativeAspect)
-                    {
-                        *reinterpret_cast<float*>(ctx.rax + 0x3C) = fAspectRatio;
-                    }
-                    else if (fAspectRatio < fNativeAspect)
-                    {
-                        *reinterpret_cast<float*>(ctx.rax + 0x38) = (atanf(tanf(45.0f * (fPi / 360)) / fAspectRatio * fNativeAspect) * (360 / fPi)) * fPi / 180;
-                        *reinterpret_cast<float*>(ctx.rax + 0x3C) = fAspectRatio;
-                    }
-                });
-        }
-        else if (!UIAspectScanResult)
-        {
-            spdlog::error("UI Aspect Ratio: Pattern scan failed.");
-        }
-
         // Fix offset cursor position when UI is scaled to 16:9
         uint8_t* UICursorPos1ScanResult = Memory::PatternScan(baseModule, "0F ?? ?? F3 0F ?? ?? F3 0F ?? ?? 0F ?? ?? 76 ?? 0F ?? ?? F3 0F ?? ?? F3 0F ?? ?? F3 0F ?? ?? 0F ?? ??");
         uint8_t* UICursorPos2ScanResult = Memory::PatternScan(baseModule, "F3 0F ?? ?? 66 0F ?? ?? F3 0F ?? ?? 66 0F ?? ?? ?? ?? 0F ?? ?? F3 0F ?? ?? F3 0F ?? ?? 29 ?? ?? ??");
@@ -287,6 +286,30 @@ void UIFix()
         {
             spdlog::error("UI Cursor Position: Pattern scan failed.");
         }
+
+        // Fix floating markers being offset 
+        uint8_t* MarkersScanResult = Memory::PatternScan(baseModule, "C7 ?? ?? 38 04 00 00 41 ?? 80 07 00 00 4C ?? ?? ??");
+        uint8_t* Markers2ScanResult = Memory::PatternScan(baseModule, "41 ?? 80 07 00 00 C7 ?? ?? ?? 38 04 00 00 33 ??");
+        if (MarkersScanResult && Markers2ScanResult)
+        {
+            spdlog::info("Markers: Address 1 is {:s}+{:x}", sExeName.c_str(), (uintptr_t)MarkersScanResult - (uintptr_t)baseModule);
+            spdlog::info("Markers: Address 2 is {:s}+{:x}", sExeName.c_str(), (uintptr_t)Markers2ScanResult - (uintptr_t)baseModule);
+
+            if (fAspectRatio > fNativeAspect)
+            {
+                Memory::Write((uintptr_t)MarkersScanResult + 0x9, (int)(1080 * fAspectRatio));
+                Memory::Write((uintptr_t)Markers2ScanResult + 0x2, (int)(1080 * fAspectRatio));
+            }
+            else if (fAspectRatio < fNativeAspect)
+            {
+                Memory::Write((uintptr_t)MarkersScanResult + 0x3, (int)(1920 / fAspectRatio));
+                Memory::Write((uintptr_t)Markers2ScanResult + 0xA, (int)(1920 / fAspectRatio));
+            }
+        }
+        else if (!MarkersScanResult || !Markers2ScanResult)
+        {
+            spdlog::error("Markers: Pattern scan failed.");
+        }
     }
 
     if (bFixUI || bDisableLetterboxing)
@@ -297,7 +320,6 @@ void UIFix()
         {
             spdlog::info("UI Width: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)UIWidthScanResult - (uintptr_t)baseModule);
 
-            static bool bHasFixedFMVs = false;
             static SafetyHookMid UIWidth2MidHook{};
             UIWidth2MidHook = safetyhook::create_mid(UIWidthScanResult,
                 [](SafetyHookContext& ctx)
@@ -324,16 +346,6 @@ void UIFix()
                                 // Write marker so we know this UI element has been modified.
                                 *reinterpret_cast<short*>(ctx.rax + 0x4C) = 420;
                             }
-
-                            // FMVs
-                            // TODO: This only works because the first element that matches the check at 0x3A0 is the movie playback layer. If movie playback is disabled this will cause the pause screen background to be scaled wrong.
-                            if (*reinterpret_cast<int*>(ctx.rax + 0x3A0) == (int)4278583300 && !bHasFixedFMVs)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)1920;
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)1080;
-                                spdlog::info("UI Width: Fixed movie playback layer.");
-                                bHasFixedFMVs = true;
-                            }
                         }
 
                         // Cutscene letterboxing
@@ -345,9 +357,8 @@ void UIFix()
                             }
                             else if (fAspectRatio < fNativeAspect)
                             {
-                                // This is dumb, just flipping the texture. Would recommend just disabling letterboxing at <16:9.
-                                // TODO: Come up with an alternative to this shit.
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)-(256 + fHUDHeightOffset);
+                                // This is dumb, just flipping the texture. Maybe just disable letterboxing at <16:9?
+                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)-256 - (short)fHUDHeightOffset;
                             }
 
                             if (bDisableLetterboxing)
@@ -447,15 +458,89 @@ void GraphicalTweaks()
     }
 }
 
+void FramerateCap()
+{
+    bool bFPSCap = false;
+    if (bFPSCap)
+    {
+        static int iFramerate = 120;
+        static float fCurrFrametime = (float)0;
+
+        // framerate cap 
+        uint8_t* FramerateCapScanResult = Memory::PatternScan(baseModule, "8B ?? ?? ?? ?? ?? 48 ?? ?? ?? 89 ?? ?? 48 ?? ?? 49 ?? ?? FF ?? ?? F3 0F ?? ?? ??");
+        if (FramerateCapScanResult)
+        {
+            spdlog::info("Framerate Cap: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)FramerateCapScanResult - (uintptr_t)baseModule);
+
+            static SafetyHookMid FramerateCapMidHook{};
+            FramerateCapMidHook = safetyhook::create_mid(FramerateCapScanResult + 0x6,
+                [](SafetyHookContext& ctx)
+                {
+                    ctx.rax = iFramerate;
+                });
+        }
+        else if (!FramerateCapScanResult)
+        {
+            spdlog::error("Framerate Cap: Pattern scan failed.");
+        }
+
+        // current frametime
+        uint8_t* CurrFrametimeScanResult = Memory::PatternScan(baseModule, "4C ?? ?? ?? ?? ?? 00 F3 0F ?? ?? ?? ?? ?? 00 F3 0F ?? ?? ?? ?? ?? ?? F3 0F ?? ?? ?? ?? ?? 00 48 ?? ?? ?? 5B C3");
+        if (CurrFrametimeScanResult)
+        {
+            spdlog::info("Current Frametime: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)CurrFrametimeScanResult - (uintptr_t)baseModule);
+
+            static SafetyHookMid CurrFrametimeMidHook{};
+            CurrFrametimeMidHook = safetyhook::create_mid(CurrFrametimeScanResult + 0x7,
+                [](SafetyHookContext& ctx)
+                {
+                    fCurrFrametime = ctx.xmm0.f32[0];
+                });
+        }
+        else if (!CurrFrametimeScanResult)
+        {
+            spdlog::error("Current Frametime: Pattern scan failed.");
+        }
+
+        // gameplay speed
+        uint8_t* GameplaySpeedScanResult = Memory::PatternScan(baseModule, "8B ?? F3 48 ?? ?? ?? 48 ?? ?? F3 0F ?? ?? ?? ?? ?? ?? FF ?? ?? 48 ?? ?? 48 ?? ?? FF ??") + 0x7;
+        uint8_t* WorldSpeedScanResult = Memory::PatternScan(baseModule, "F3 ?? ?? ?? ?? F3 0F ?? ?? F3 0F ?? ?? ?? E8 ?? ?? ?? ?? 84 ?? 74 ??") + 0x5;
+        if (GameplaySpeedScanResult)
+        {
+            spdlog::info("Gameplay Speed: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)GameplaySpeedScanResult - (uintptr_t)baseModule);
+
+            static SafetyHookMid GameplaySpeedMidHook{};
+            GameplaySpeedMidHook = safetyhook::create_mid(GameplaySpeedScanResult,
+                [](SafetyHookContext& ctx)
+                {
+                    ctx.xmm1.f32[0] = (float)60 * fCurrFrametime;
+                });
+
+            static SafetyHookMid WorldSpeedMidHook{};
+            WorldSpeedMidHook = safetyhook::create_mid(WorldSpeedScanResult,
+                [](SafetyHookContext& ctx)
+                {
+                    ctx.xmm1.f32[0] = (float)60 * fCurrFrametime;
+                });
+        }
+        else if (!GameplaySpeedScanResult)
+        {
+            spdlog::error("Gameplay Speed: Pattern scan failed.");
+        }
+    }
+}
+
 DWORD __stdcall Main(void*)
 {
     Logging();
     ReadConfig();
+    EarlyPatch();
     Sleep(iInjectionDelay);
     ResolutionFix();
     UIFix();
     FOVFix();
     GraphicalTweaks();
+    FramerateCap();
     return true; //end thread
 }
 
