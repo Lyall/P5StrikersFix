@@ -25,8 +25,7 @@ This is a fix that adds custom resolutions, ultrawide support and more to Person
 Please report any issues you see.
 This list will contain bugs which may or may not be fixed.
 
-- Floating markers (i.e. enemy health hearts/damage numbers, dialogue interaction markers) are displayed at the wrong aspect ratio.
-- Waypoint markers are misaligned.
+- FMV playback is stretched.
 
 ## Screenshots
 
