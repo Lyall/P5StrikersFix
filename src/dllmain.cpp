@@ -92,7 +92,6 @@ void ReadConfig()
     {
         spdlog::critical("Failed to load config file.");
         spdlog::critical("Make sure {} is present in the game folder.", sConfigFile);
-
     }
     else
     {
@@ -372,7 +371,7 @@ void UIFix()
             spdlog::error("Markers: Pattern scan failed.");
         }
 
-        // Is movie playing
+        // Movie playback status
         uint8_t* MoviePlaybackScanResult = Memory::PatternScan(baseModule, "83 ?? ?? ?? ?? ?? FF 75 ?? 48 ?? ?? ?? ?? ?? ?? 48 ?? ?? FF ?? ?? ?? ?? ??");
         if (MoviePlaybackScanResult)
         {
@@ -536,7 +535,7 @@ void GraphicalTweaks()
     if (iShadowQuality != 0)
     {
         // Shadow Quality
-        // Changes highest quality shadow resolution
+        // Changes "high" quality shadow resolution
         uint8_t* ShadowQuality1ScanResult = Memory::PatternScan(baseModule, "00 10 00 00 00 10 00 00 4E 00 00 00 00 04 00 00");
         uint8_t* ShadowQuality2ScanResult = Memory::PatternScan(baseModule, "BA 00 10 00 00 44 ?? ?? EB ?? BA 00 08 00 00 ");
         if (ShadowQuality1ScanResult && ShadowQuality2ScanResult)
