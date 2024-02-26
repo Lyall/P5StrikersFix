@@ -247,7 +247,10 @@ void ResolutionFix()
         {
             spdlog::error("Custom Resolution: Borderless: Pattern scan failed.");
         }
+    }
 
+    if (bRTScaling)
+    {
         // Get render scale address
         uint8_t* RenderScaleScanResult = Memory::PatternScan(baseModule, "00 00 00 00 66 0F ?? ?? ?? ?? ?? ?? 0F ?? ?? F3 0F ?? ?? ?? ?? ?? ?? C3");
         if (RenderScaleScanResult)
@@ -271,7 +274,7 @@ void ResolutionFix()
             RenderTargetResolutionHook = safetyhook::create_mid(RenderTargetResolutionScanResult,
                 [](SafetyHookContext& ctx)
                 {
-                    if (RenderScaleAddress)
+                    if (RenderScaleAddress && bRTUseRenderScale)
                     {
                         fRenderScale = (float)*reinterpret_cast<int*>(RenderScaleAddress) / 10;
                     }
@@ -284,13 +287,13 @@ void ResolutionFix()
             RenderTargetResolution2Hook = safetyhook::create_mid(RenderTargetResolution2ScanResult,
                 [](SafetyHookContext& ctx)
                 {
-                    if (RenderScaleAddress)
+                    if (RenderScaleAddress && bRTUseRenderScale)
                     {
                         fRenderScale = (float)*reinterpret_cast<int*>(RenderScaleAddress) / 10;
                     }
                     ctx.r13 = iCustomResX * fRenderScale;
                     ctx.rdi = iCustomResY * fRenderScale;
-                });   
+                });
         }
         else if (!RenderTargetResolutionScanResult || !RenderTargetResolution2ScanResult)
         {
