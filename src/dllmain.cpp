@@ -380,49 +380,58 @@ void UIFix()
             UIWidth2MidHook = safetyhook::create_mid(UIWidthScanResult,
                 [](SafetyHookContext& ctx)
                 {
-                    if (ctx.rax + 0xF0 && ctx.rax + 0xF2)
+                    if (ctx.rax)
                     {
-                        // Useful for finding UI object names
-                        //std::string objectName = (std::string)(char*)(ctx.rax + 0x280);
-                        //spdlog::info("UI Width: Object name = {}: {}x{}", objectName, *reinterpret_cast<short*>(ctx.rax + 0xF0), *reinterpret_cast<short*>(ctx.rax + 0xF2));
+                        // Get starting values
+                        short iWidth = *reinterpret_cast<short*>(ctx.rax + 0xF0);
+                        short iHeight = *reinterpret_cast<short*>(ctx.rax + 0xF2);
+                        int iMarker = *reinterpret_cast<int*>(ctx.rax + 0x4C);
 
-                        // Resize all UI elements that are 1920-2048x1080-1200
-                        // Check for marker to make sure we aren't editing the same element more than once. (This is a jank solution.)
-                        if ((*reinterpret_cast<short*>(ctx.rax + 0xF0) >= (short)1920 && *reinterpret_cast<short*>(ctx.rax + 0xF0) <= (short)2048) && (*reinterpret_cast<short*>(ctx.rax + 0xF2) >= (short)1080 && *reinterpret_cast<short*>(ctx.rax + 0xF2) <= (short)1200) && (*reinterpret_cast<short*>(ctx.rax + 0x4C) == 0))
+                        // Check for marker so we don't edit the same thing twice.
+                        if (iMarker != 420)
                         {
-                            if (fAspectRatio > fNativeAspect)
+                            // Resize all UI elements that are 1920-2048x1080-1200
+                            if ((iWidth >= (short)1920 && iWidth <= (short)2048) && (iHeight >= (short)1080 && iHeight <= (short)1200))
                             {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = *reinterpret_cast<short*>(ctx.rax + 0xF2) * fAspectRatio;
-                                // Write marker so we know this UI element has been modified.
-                                *reinterpret_cast<short*>(ctx.rax + 0x4C) = 420;
+                                if (fAspectRatio > fNativeAspect)
+                                {
+                                    iWidth = iHeight * fAspectRatio;
+                                }
+                                else if (fAspectRatio < fNativeAspect)
+                                {
+                                    iHeight = iWidth / fAspectRatio;
+                                }
+                                // Add marker
+                                iMarker = 420;
                             }
-                            else if (fAspectRatio < fNativeAspect)
+
+                            // Cutscene letterboxing
+                            if (iHeight == (short)1920 && iWidth == (short)256)
                             {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = *reinterpret_cast<short*>(ctx.rax + 0xF0) / fAspectRatio;
-                                // Write marker so we know this UI element has been modified.
-                                *reinterpret_cast<short*>(ctx.rax + 0x4C) = 420;
+                                if (fAspectRatio > fNativeAspect)
+                                {
+                                    iWidth = (short)1920 * fAspectMultiplier;
+                                }
+                                else if (fAspectRatio < fNativeAspect)
+                                {
+                                    // This is dumb, just flipping the texture. Maybe just disable letterboxing at <16:9?
+                                    iHeight = (short)-256 - (short)fHUDHeightOffset;
+                                }
+
+                                if (bDisableLetterboxing)
+                                {
+                                    iWidth = (short)0;
+                                    iHeight = (short)0;
+                                }
+                                // Add marker
+                                iMarker = 420;
                             }
                         }
 
-                        // Cutscene letterboxing
-                        if (*reinterpret_cast<short*>(ctx.rax + 0xF0) == (short)1920 && *reinterpret_cast<short*>(ctx.rax + 0xF2) == (short)256)
-                        {
-                            if (fAspectRatio > fNativeAspect)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)1920 * fAspectMultiplier;
-                            }
-                            else if (fAspectRatio < fNativeAspect)
-                            {
-                                // This is dumb, just flipping the texture. Maybe just disable letterboxing at <16:9?
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)-256 - (short)fHUDHeightOffset;
-                            }
-
-                            if (bDisableLetterboxing)
-                            {
-                                *reinterpret_cast<short*>(ctx.rax + 0xF0) = (short)0;
-                                *reinterpret_cast<short*>(ctx.rax + 0xF2) = (short)0;
-                            }
-                        }
+                        // Write modified values
+                        *reinterpret_cast<short*>(ctx.rax + 0xF0) = iWidth;
+                        *reinterpret_cast<short*>(ctx.rax + 0xF2) = iHeight;
+                        *reinterpret_cast<short*>(ctx.rax + 0x4C) = iMarker;
                     }
                 });
         }
