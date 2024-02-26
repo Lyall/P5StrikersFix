@@ -8,6 +8,7 @@ This is a fix that adds custom resolutions, ultrawide support and more to Person
 - Custom resolution support.
 - Ultrawide/narrow aspect ratio support.
 - Correct FOV at any aspect ratio.
+- Gameplay FOV adjustment.
 - HUD is scaled to 16:9.
 - Ability to scale up resolution of UI render targets.
 - Shadow resolution setting.
