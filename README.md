@@ -11,6 +11,7 @@ This is a fix that adds custom resolutions, ultrawide support and more to Person
 - HUD is scaled to 16:9.
 - Ability to scale up resolution of UI render targets.
 - Shadow resolution setting.
+- Option to disable cutscene letterboxing.
 
 ## Installation
 - Grab the latest release of P3RFix from [here.](https://github.com/Lyall/P3RFix/releases)
