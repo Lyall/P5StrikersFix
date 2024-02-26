@@ -31,9 +31,13 @@ This list will contain bugs which may or may not be fixed.
 
 ## Screenshots
 
-| ![ezgif-4-8983b25596](https://github.com/Lyall/P5StrikersFix/assets/695941/76edf561-06c0-455c-9bd4-8df7cbc0d07d) |
+| ![ingame p5s](https://github.com/Lyall/P5StrikersFix/assets/695941/8b1fed3b-5d5e-4c11-bd44-07a62360cf90) |
 |:--:|
 | Gameplay |
+
+| ![cutscenes p5s](https://github.com/Lyall/P5StrikersFix/assets/695941/2018c7a4-f28c-4b07-b8ff-7cb0afeba111) |
+|:--:|
+| Cutscene |
 
 ## Credits
 [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) for ASI loading. <br />
