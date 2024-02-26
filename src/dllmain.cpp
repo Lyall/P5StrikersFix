@@ -20,6 +20,8 @@ int iInjectionDelay;
 bool bCustomRes;
 int iCustomResX;
 int iCustomResY;
+bool bRTScaling;
+bool bRTUseRenderScale;
 bool bFixUI;
 bool bFixFOV;
 float fAdditionalFOV;
@@ -100,6 +102,8 @@ void ReadConfig()
     inipp::get_value(ini.sections["Custom Resolution"], "Enabled", bCustomRes);
     inipp::get_value(ini.sections["Custom Resolution"], "Width", iCustomResX);
     inipp::get_value(ini.sections["Custom Resolution"], "Height", iCustomResY);
+    inipp::get_value(ini.sections["Render Target Scaling"], "Enabled", bRTScaling);
+    inipp::get_value(ini.sections["Render Target Scaling"], "UseRenderScale", bRTUseRenderScale);
     inipp::get_value(ini.sections["Fix UI"], "Enabled", bFixUI);
     inipp::get_value(ini.sections["Fix FOV"], "Enabled", bFixFOV);
     inipp::get_value(ini.sections["Fix FOV"], "AdditionalFOV", fAdditionalFOV);
@@ -111,6 +115,8 @@ void ReadConfig()
     spdlog::info("Config Parse: bCustomRes: {}", bCustomRes);
     spdlog::info("Config Parse: iCustomResX: {}", iCustomResX);
     spdlog::info("Config Parse: iCustomResY: {}", iCustomResY);
+    spdlog::info("Config Parse: bRTScaling: {}", bRTScaling);
+    spdlog::info("Config Parse: bRTUseRenderScale: {}", bRTUseRenderScale);
     spdlog::info("Config Parse: bFixUI: {}", bFixUI);
     spdlog::info("Config Parse: bFixFOV: {}", bFixFOV);
     spdlog::info("Config Parse: fAdditionalFOV: {}", fAdditionalFOV);
@@ -590,7 +596,7 @@ DWORD __stdcall Main(void*)
     UIFix();
     FOVFix();
     GraphicalTweaks();
-    FramerateCap();
+    //FramerateCap();
     return true; //end thread
 }
 
