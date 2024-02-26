@@ -43,6 +43,8 @@ float fHUDHeightOffset;
 // Variables
 float fRenderScale = 1.0f;
 DWORD64 RenderScaleAddress;
+bool bIsMoviePlaying = false;
+DWORD64 MoviePlaybackAddress;
 HMODULE baseModule = GetModuleHandle(NULL);
 
 void Logging()
@@ -366,6 +368,20 @@ void UIFix()
         {
             spdlog::error("Markers: Pattern scan failed.");
         }
+
+        // Is movie playing
+        uint8_t* MoviePlaybackScanResult = Memory::PatternScan(baseModule, "83 ?? ?? ?? ?? ?? FF 75 ?? 48 ?? ?? ?? ?? ?? ?? 48 ?? ?? FF ?? ?? ?? ?? ??");
+        if (MoviePlaybackScanResult)
+        {
+            spdlog::info("Movie Playback: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)MoviePlaybackScanResult - (uintptr_t)baseModule);
+            MoviePlaybackAddress = Memory::GetAbsolute((uintptr_t)MoviePlaybackScanResult + 0xC) + 0x6C;
+            spdlog::info("Movie Playback: Value address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)MoviePlaybackAddress - (uintptr_t)baseModule);
+
+        }
+        else if (!MoviePlaybackScanResult)
+        {
+            spdlog::error("Movie Playback: Pattern scan failed.");
+        }
     }
 
     if (bFixUI || bDisableLetterboxing)
@@ -383,9 +399,22 @@ void UIFix()
                     if (ctx.rax)
                     {
                         // Get starting values
+                        std::string sObjectName = (std::string)(char*)(ctx.rax + 0x280);
                         short iWidth = *reinterpret_cast<short*>(ctx.rax + 0xF0);
                         short iHeight = *reinterpret_cast<short*>(ctx.rax + 0xF2);
                         int iMarker = *reinterpret_cast<int*>(ctx.rax + 0x4C);
+                        if (MoviePlaybackAddress)
+                        {
+                            bIsMoviePlaying = *reinterpret_cast<int*>(MoviePlaybackAddress);
+                        }
+
+                        // Find movie playback layer and add marker so it remains unmodified.
+                        if (iWidth == (short)1920 && iHeight == (short)1080 && sObjectName.contains("parts_blank") && iMarker == 0 && bIsMoviePlaying)
+                        {
+                            // Add marker
+                            iMarker = 420;
+                            spdlog::info("UI Width: Fixed FMV playback.");
+                        }
 
                         // Check for marker so we don't edit the same thing twice.
                         if (iMarker != 420)
@@ -406,7 +435,7 @@ void UIFix()
                             }
 
                             // Cutscene letterboxing
-                            if (iHeight == (short)1920 && iWidth == (short)256)
+                            if (iWidth == (short)1920 && iHeight == (short)256)
                             {
                                 if (fAspectRatio > fNativeAspect)
                                 {
