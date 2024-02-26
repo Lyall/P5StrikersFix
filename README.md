@@ -27,7 +27,6 @@ This is a fix that adds custom resolutions, ultrawide support and more to Person
 Please report any issues you see.
 This list will contain bugs which may or may not be fixed.
 
-- FMV playback is stretched.
 - Cutscene letterboxing looks bad at <16:9. I'd recommend disabling the cutscene letterboxing in **P5StrikersFix.ini**.
 
 ## Screenshots
