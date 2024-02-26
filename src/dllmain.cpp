@@ -38,6 +38,9 @@ float fHUDHeight;
 float fHUDWidthOffset;
 float fHUDHeightOffset;
 
+// Variables
+float fRenderScale = 1.0f;
+DWORD64 RenderScaleAddress;
 HMODULE baseModule = GetModuleHandle(NULL);
 
 void Logging()
@@ -184,8 +187,6 @@ void ResolutionFix()
 {
     if (bCustomRes)
     {
-        // TODO: Check to see DSR can be supported properly.
-
         // Apply custom resolution
         uint8_t* ResolutionScanResult = Memory::PatternScan(baseModule, "89 ?? ?? ?? 00 00 48 ?? ?? ?? ?? ?? ?? 83 ?? ?? 77 ?? 8B ?? ?? ?? ?? ?? ?? EB ?? B9 D0 02 00 00");
         if (ResolutionScanResult)
@@ -237,6 +238,55 @@ void ResolutionFix()
         else if (!BorderlessModeScanResult)
         {
             spdlog::error("Custom Resolution: Borderless: Pattern scan failed.");
+        }
+
+        // Get render scale address
+        uint8_t* RenderScaleScanResult = Memory::PatternScan(baseModule, "00 00 00 00 66 0F ?? ?? ?? ?? ?? ?? 0F ?? ?? F3 0F ?? ?? ?? ?? ?? ?? C3");
+        if (RenderScaleScanResult)
+        {
+            spdlog::info("Render Scale: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)RenderScaleScanResult - (uintptr_t)baseModule);
+            RenderScaleAddress = Memory::GetAbsolute((uintptr_t)RenderScaleScanResult + 0x8);
+            spdlog::info("Render Scale: Value address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)RenderScaleAddress - (uintptr_t)baseModule);
+        }
+        else if (!RenderScaleScanResult)
+        {
+            spdlog::error("Render Scale: Pattern scan failed.");
+        }
+
+        // Set render target resolution
+        uint8_t* RenderTargetResolutionScanResult = Memory::PatternScan(baseModule, "41 ?? ?? 89 ?? ?? ?? 89 ?? ?? ?? 48 ?? ?? E8 ?? ?? ?? ??");
+        uint8_t* RenderTargetResolution2ScanResult = Memory::PatternScan(baseModule, "41 ?? ?? 49 ?? ?? ?? 44 ?? ?? 89 ?? ?? ?? 89 ?? ?? ?? 44 ?? ?? ?? ??");
+        if (RenderTargetResolutionScanResult && RenderTargetResolution2ScanResult)
+        {
+            spdlog::info("Render Target Resolution: Address 1 is {:s}+{:x}", sExeName.c_str(), (uintptr_t)RenderTargetResolutionScanResult - (uintptr_t)baseModule);
+            static SafetyHookMid RenderTargetResolutionHook{};
+            RenderTargetResolutionHook = safetyhook::create_mid(RenderTargetResolutionScanResult,
+                [](SafetyHookContext& ctx)
+                {
+                    if (RenderScaleAddress)
+                    {
+                        fRenderScale = (float)*reinterpret_cast<int*>(RenderScaleAddress) / 10;
+                    }
+                    ctx.r10 = iCustomResX * fRenderScale;
+                    ctx.r8 = iCustomResY * fRenderScale;
+                });
+
+            spdlog::info("Render Target Resolution: Address 2 is {:s}+{:x}", sExeName.c_str(), (uintptr_t)RenderTargetResolution2ScanResult - (uintptr_t)baseModule);
+            static SafetyHookMid RenderTargetResolution2Hook{};
+            RenderTargetResolution2Hook = safetyhook::create_mid(RenderTargetResolution2ScanResult,
+                [](SafetyHookContext& ctx)
+                {
+                    if (RenderScaleAddress)
+                    {
+                        fRenderScale = (float)*reinterpret_cast<int*>(RenderScaleAddress) / 10;
+                    }
+                    ctx.r13 = iCustomResX * fRenderScale;
+                    ctx.rdi = iCustomResY * fRenderScale;
+                });   
+        }
+        else if (!RenderTargetResolutionScanResult || !RenderTargetResolution2ScanResult)
+        {
+            spdlog::error("Render Target Resolution: Pattern scan failed.");
         }
     }
 }
