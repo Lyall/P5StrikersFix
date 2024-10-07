@@ -8,7 +8,7 @@
 // Ini parser setup
 inipp::Ini<char> ini;
 std::string sFixName = "P5StrikersFix";
-std::string sFixVer = "1.0.0";
+std::string sFixVer = "1.0.1";
 std::string sLogFile = "P5StrikersFix.log";
 std::string sConfigFile = "P5StrikersFix.ini";
 std::string sExeName;
@@ -27,6 +27,8 @@ bool bFixFOV;
 float fAdditionalFOV;
 bool bDisableLetterboxing;
 int iShadowQuality;
+bool bFixAnalog;
+bool bIntroSkip;
 
 // Aspect ratio + HUD stuff
 float fPi = (float)3.141592653;
@@ -110,6 +112,8 @@ void ReadConfig()
     inipp::get_value(ini.sections["Fix FOV"], "AdditionalFOV", fAdditionalFOV);
     inipp::get_value(ini.sections["Disable Cutscene Letterboxing"], "Enabled", bDisableLetterboxing);
     inipp::get_value(ini.sections["Shadow Quality"], "Resolution", iShadowQuality);
+    inipp::get_value(ini.sections["Fix Analog Movement"], "Enabled", bFixAnalog);
+    inipp::get_value(ini.sections["Intro Skip"], "Enabled", bIntroSkip);
 
     // Log config parse
     spdlog::info("Config Parse: iInjectionDelay: {}ms", iInjectionDelay);
@@ -123,6 +127,8 @@ void ReadConfig()
     spdlog::info("Config Parse: fAdditionalFOV: {}", fAdditionalFOV);
     spdlog::info("Config Parse: bDisableLetterboxing: {}", bDisableLetterboxing);
     spdlog::info("Config Parse: iShadowQuality: {}", iShadowQuality);
+    spdlog::info("Config Parse: bFixAnalog: {}", bFixAnalog);
+    spdlog::info("Config Parse: bIntroSkip: {}", bIntroSkip);
     spdlog::info("----------");
 
     // Calculate aspect ratio / use desktop res instead
@@ -277,8 +283,8 @@ void ResolutionFix()
                     {
                         fRenderScale = (float)*reinterpret_cast<int*>(RenderScaleAddress) / 10;
                     }
-                    ctx.r10 = iCustomResX * fRenderScale;
-                    ctx.r8 = iCustomResY * fRenderScale;
+                    ctx.r10 = static_cast<int>(iCustomResX * fRenderScale);
+                    ctx.r8 = static_cast<int>(iCustomResY * fRenderScale);
                 });
 
             spdlog::info("Render Target Resolution: Address 2 is {:s}+{:x}", sExeName.c_str(), (uintptr_t)RenderTargetResolution2ScanResult - (uintptr_t)baseModule);
@@ -290,8 +296,8 @@ void ResolutionFix()
                     {
                         fRenderScale = (float)*reinterpret_cast<int*>(RenderScaleAddress) / 10;
                     }
-                    ctx.r13 = iCustomResX * fRenderScale;
-                    ctx.rdi = iCustomResY * fRenderScale;
+                    ctx.r13 = static_cast<int>(iCustomResX * fRenderScale);
+                    ctx.rdi = static_cast<int>(iCustomResY * fRenderScale);
                 });
         }
         else if (!RenderTargetResolutionScanResult || !RenderTargetResolution2ScanResult)
@@ -426,11 +432,11 @@ void UIFix()
                             {
                                 if (fAspectRatio > fNativeAspect)
                                 {
-                                    iWidth = iHeight * fAspectRatio;
+                                    iWidth = static_cast<short>(iHeight * fAspectRatio);
                                 }
                                 else if (fAspectRatio < fNativeAspect)
                                 {
-                                    iHeight = iWidth / fAspectRatio;
+                                    iHeight = static_cast<short>(iWidth / fAspectRatio);
                                 }
                                 // Add marker
                                 iMarker = 420;
@@ -441,12 +447,12 @@ void UIFix()
                             {
                                 if (fAspectRatio > fNativeAspect)
                                 {
-                                    iWidth = (short)1920 * fAspectMultiplier;
+                                    iWidth = static_cast<short>(1920 * fAspectMultiplier);
                                 }
                                 else if (fAspectRatio < fNativeAspect)
                                 {
                                     // This is dumb, just flipping the texture. Maybe just disable letterboxing at <16:9?
-                                    iHeight = (short)-256 - (short)fHUDHeightOffset;
+                                    iHeight = static_cast<short>(-256 - fHUDHeightOffset);
                                 }
 
                                 if (bDisableLetterboxing)
@@ -530,14 +536,30 @@ void FOVFix()
     }
 }
 
-void GraphicalTweaks()
+void Misc()
 {
+    if (bIntroSkip) 
+    {
+        // Intro skip
+        uint8_t* IntroSkipScanResult = Memory::PatternScan(baseModule, "C7 ?? ?? 04 00 00 00 48 ?? ?? ?? ?? 48 ?? ?? ?? 5F E9 ?? ?? ?? ?? 41 ?? 01");
+        if (IntroSkipScanResult)
+        {
+            spdlog::info("Intro Skip: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)IntroSkipScanResult - (uintptr_t)baseModule);
+            Memory::Write((uintptr_t)IntroSkipScanResult + 0x3, 10);
+            spdlog::info("Intro Skip: Patched instruction.");
+        }
+        else if (!IntroSkipScanResult)
+        {
+            spdlog::error("Intro Skip: Pattern scan failed.");
+        }
+    }
+
     if (iShadowQuality != 0)
     {
         // Shadow Quality
         // Changes "high" quality shadow resolution
         uint8_t* ShadowQuality1ScanResult = Memory::PatternScan(baseModule, "00 10 00 00 00 10 00 00 4E 00 00 00 00 04 00 00");
-        uint8_t* ShadowQuality2ScanResult = Memory::PatternScan(baseModule, "BA 00 10 00 00 44 ?? ?? EB ?? BA 00 08 00 00 ");
+        uint8_t* ShadowQuality2ScanResult = Memory::PatternScan(baseModule, "BA 00 10 00 00 44 ?? ?? EB ?? BA 00 08 00 00");
         if (ShadowQuality1ScanResult && ShadowQuality2ScanResult)
         {
             spdlog::info("Shadow Quality: Address 1 is {:s}+{:x}", sExeName.c_str(), (uintptr_t)ShadowQuality1ScanResult - (uintptr_t)baseModule);
@@ -549,79 +571,23 @@ void GraphicalTweaks()
         }
         else if (!ShadowQuality1ScanResult || !ShadowQuality2ScanResult)
         {
-            spdlog::error("Shadow Quality: Pattern scan failed.");
+            spdlog::error("Shadow Quality: Pattern scan(s) failed.");
         }
     }
-}
 
-void FramerateCap()
-{
-    bool bFPSCap = false;
-    if (bFPSCap)
+    if (bFixAnalog) 
     {
-        static int iFramerate = 120;
-        static float fCurrFrametime = (float)0;
-
-        // framerate cap 
-        uint8_t* FramerateCapScanResult = Memory::PatternScan(baseModule, "8B ?? ?? ?? ?? ?? 48 ?? ?? ?? 89 ?? ?? 48 ?? ?? 49 ?? ?? FF ?? ?? F3 0F ?? ?? ??");
-        if (FramerateCapScanResult)
+        // Fix 8-way analog movement
+        uint8_t* XInputGetStateScanResult = Memory::PatternScan(baseModule, "F3 0F ?? ?? ?? ?? ?? ?? 8D ?? ?? 83 ?? 07 77 ?? 48 ?? ?? ?? ?? 8B ?? E8 ?? ?? ?? ??");
+        if (XInputGetStateScanResult)
         {
-            spdlog::info("Framerate Cap: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)FramerateCapScanResult - (uintptr_t)baseModule);
-
-            static SafetyHookMid FramerateCapMidHook{};
-            FramerateCapMidHook = safetyhook::create_mid(FramerateCapScanResult + 0x6,
-                [](SafetyHookContext& ctx)
-                {
-                    ctx.rax = iFramerate;
-                });
+            spdlog::info("Analog Movement Fix: XInputGetState: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)XInputGetStateScanResult - (uintptr_t)baseModule);
+            Memory::PatchBytes((uintptr_t)XInputGetStateScanResult, "\x0F\x57\xFF\x90\x90\x90\x90\x90", 8);
+            spdlog::info("Analog Movement Fix: XInputGetState: Patched instruction.");
         }
-        else if (!FramerateCapScanResult)
+        else if (!XInputGetStateScanResult)
         {
-            spdlog::error("Framerate Cap: Pattern scan failed.");
-        }
-
-        // current frametime
-        uint8_t* CurrFrametimeScanResult = Memory::PatternScan(baseModule, "4C ?? ?? ?? ?? ?? 00 F3 0F ?? ?? ?? ?? ?? 00 F3 0F ?? ?? ?? ?? ?? ?? F3 0F ?? ?? ?? ?? ?? 00 48 ?? ?? ?? 5B C3");
-        if (CurrFrametimeScanResult)
-        {
-            spdlog::info("Current Frametime: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)CurrFrametimeScanResult - (uintptr_t)baseModule);
-
-            static SafetyHookMid CurrFrametimeMidHook{};
-            CurrFrametimeMidHook = safetyhook::create_mid(CurrFrametimeScanResult + 0x7,
-                [](SafetyHookContext& ctx)
-                {
-                    fCurrFrametime = ctx.xmm0.f32[0];
-                });
-        }
-        else if (!CurrFrametimeScanResult)
-        {
-            spdlog::error("Current Frametime: Pattern scan failed.");
-        }
-
-        // gameplay speed
-        uint8_t* GameplaySpeedScanResult = Memory::PatternScan(baseModule, "8B ?? F3 48 ?? ?? ?? 48 ?? ?? F3 0F ?? ?? ?? ?? ?? ?? FF ?? ?? 48 ?? ?? 48 ?? ?? FF ??") + 0x7;
-        uint8_t* WorldSpeedScanResult = Memory::PatternScan(baseModule, "F3 ?? ?? ?? ?? F3 0F ?? ?? F3 0F ?? ?? ?? E8 ?? ?? ?? ?? 84 ?? 74 ??") + 0x5;
-        if (GameplaySpeedScanResult)
-        {
-            spdlog::info("Gameplay Speed: Address is {:s}+{:x}", sExeName.c_str(), (uintptr_t)GameplaySpeedScanResult - (uintptr_t)baseModule);
-
-            static SafetyHookMid GameplaySpeedMidHook{};
-            GameplaySpeedMidHook = safetyhook::create_mid(GameplaySpeedScanResult,
-                [](SafetyHookContext& ctx)
-                {
-                    ctx.xmm1.f32[0] = (float)60 * fCurrFrametime;
-                });
-
-            static SafetyHookMid WorldSpeedMidHook{};
-            WorldSpeedMidHook = safetyhook::create_mid(WorldSpeedScanResult,
-                [](SafetyHookContext& ctx)
-                {
-                    ctx.xmm1.f32[0] = (float)60 * fCurrFrametime;
-                });
-        }
-        else if (!GameplaySpeedScanResult)
-        {
-            spdlog::error("Gameplay Speed: Pattern scan failed.");
+            spdlog::error("Analog Movement Fix: XInputGetState: Pattern scan failed.");
         }
     }
 }
@@ -635,8 +601,7 @@ DWORD __stdcall Main(void*)
     ResolutionFix();
     UIFix();
     FOVFix();
-    GraphicalTweaks();
-    //FramerateCap();
+    Misc();
     return true; //end thread
 }
 
