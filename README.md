@@ -5,14 +5,20 @@
 This is a fix that adds custom resolutions, ultrawide support and more to Persona 5 Strikers.
 
 ## Features
+
+### General
 - Custom resolution support.
+- Skip intro logos.
+- Gameplay FOV adjustment.
+- Option to disable cutscene letterboxing.
+- Shadow resolution setting.
+- Ability to scale up resolution of UI render targets.
+- Fix 8-way analog movement.
+
+### Ultrawide/narrower
 - Ultrawide/narrow aspect ratio support.
 - Correct FOV at any aspect ratio.
-- Gameplay FOV adjustment.
 - HUD is scaled to 16:9.
-- Ability to scale up resolution of UI render targets.
-- Shadow resolution setting.
-- Option to disable cutscene letterboxing.
 
 ## Installation
 - Grab the latest release of P3RFix from [here.](https://github.com/Lyall/P3RFix/releases)
