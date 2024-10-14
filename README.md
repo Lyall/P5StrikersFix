@@ -21,7 +21,7 @@ This is a fix for Persona 5 Strikers that adds support for custom resolutions, u
 - HUD is scaled to 16:9.
 
 ## Installation
-- Grab the latest release of P3RFix from [here.](https://github.com/Lyall/P3RFix/releases)
+- Grab the latest release of P5StrikersFix from [here.](https://github.com/Lyall/P5StrikersFix/releases)
 - Extract the contents of the release zip in to the the game folder. e.g. "**steamapps\common\P5S**" for Steam).
 
 ### Steam Deck/Linux Additional Instructions
